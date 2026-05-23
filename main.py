@@ -1,26 +1,27 @@
 import json
 import time
+import os
 import requests
 import pyttsx3
 import pyaudio
 import vosk
+import webbrowser
 from PIL import Image
 from io import BytesIO
-import webbrowser
+import subprocess
 
 class Speech:
     def __init__(self):
-        self.tts = pyttsx3.init('sapi5')
-        self.tts.setProperty('rate', 150)
+        self.rate = 140
 
     def text2voice(self, text):
-        self.tts.say(text)
-        self.tts.runAndWait()
+        subprocess.call(['say', '-r', str(self.rate), text])
 
 
 class Recognize:
     def __init__(self):
-        model = vosk.Model('model_small')
+        model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model_small')
+        model = vosk.Model(model_path)
         self.record = vosk.KaldiRecognizer(model, 16000)
         self.pa = pyaudio.PyAudio()
         self.stream = self.pa.open(
@@ -48,45 +49,48 @@ class DogAssistant:
         self.api_url = 'https://dog.ceo/api/breeds/image/random'
 
     def get_dog_image(self):
-        try:
-            response = requests.get(self.api_url)
-            data = response.json()
-            if data['status'] == 'success':
-                self.current_url = data['message']
-                image_data = requests.get(self.current_url).content
-                self.current_image = Image.open(BytesIO(image_data))
-                self.speech.text2voice('Готово')
-                return True
-        except Exception as e:
-            self.speech.text2voice('Ошибка в запросе')
-            print(e)
+        response = requests.get(self.api_url)
+        data = response.json()
+        
+        if data['status'] == 'success':
+            self.current_url = data['message']
+            image_data = requests.get(self.current_url).content
+            self.current_image = Image.open(BytesIO(image_data))
+            
+            self.current_image.show()
+            
+            self.speech.text2voice('Готово')
+            return True
+        
         return False
 
     def save_image(self):
         if self.current_image:
-            try:
-                self.current_image.save('dog_image.jpg')
-                self.speech.text2voice('Сохранено')
-            except Exception:
-                self.speech.text2voice('Ошибка сохранения')
+            self.current_image.save('dog_image.jpg')
+            self.speech.text2voice('сохранено')
         else:
-            self.speech.text2voice('Сначала получите изображение')
+            self.speech.text2voice('сначала получите изображение')
 
     def get_breed(self):
-        if self.current_url:
-            try:
-                parts = self.current_url.split('/')
-                breed = parts[-2].replace('-', ' ')
-                self.speech.text2voice('Порода: ' + breed)
-            except Exception:
-                self.speech.text2voice('Не удалось определить породу')
+        
+        if self.current_url is None:
+            self.speech.text2voice('сначала получите изображение')
+            return
+        
+        parts = self.current_url.split('/')
+        breed = parts[-2].replace('-', ' ')
+        
+        print('порода собачки:', breed)
+        
+        if not breed or breed == 'breeds':
+            self.speech.text2voice('порода не указана в ссылке')
         else:
-            self.speech.text2voice('Сначала получите изображение')
+            self.speech.text2voice('порода собачки: ' + breed)
 
     def get_resolution(self):
         if self.current_image:
             width, height = self.current_image.size
-            text = 'Разрешение: ' + str(width) + ' на ' + str(height) + ' пикселей'
+            text = 'разрешение: ' + str(width) + ' на ' + str(height) + ' пикселей'
             self.speech.text2voice(text)
         else:
             self.speech.text2voice('Сначала получите изображение')
@@ -98,7 +102,7 @@ class DogAssistant:
             self.speech.text2voice('До свидания')
             return False
         
-        elif text == 'показать' or text == 'следующая':
+        elif text == 'покажи собаку' or text == 'ещё':
             self.get_dog_image()
         
         elif text == 'сохранить':
@@ -111,14 +115,13 @@ class DogAssistant:
             self.get_resolution()
         
         else:
-            self.speech.text2voice('Команда не распознана')
-            print('Распознано:', text)
+            print('распознано:', text)
         
         return True
 
     def run(self):
         recognizer = Recognize()
-        self.speech.text2voice('Ассистент готов')
+        self.speech.text2voice('ассистент готов показывать собак')
         
         for text in recognizer.listen():
             if not self.process_command(text):
