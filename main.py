@@ -1,11 +1,8 @@
 import json
-import time
 import os
 import requests
-import pyttsx3
 import pyaudio
 import vosk
-import webbrowser
 from PIL import Image
 from io import BytesIO
 import subprocess
@@ -79,6 +76,8 @@ class DogAssistant:
         
         parts = self.current_url.split('/')
         breed = parts[-2].replace('-', ' ')
+
+        #пример https://images.dog.ceo/breeds/hound-afghan/n02088094_1003.jpg 
         
         print('порода собачки:', breed)
         
